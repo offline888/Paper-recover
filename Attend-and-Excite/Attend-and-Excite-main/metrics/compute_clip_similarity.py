@@ -3,11 +3,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-import clip
+import torch
 import numpy as np
 import pyrallis
-import torch
 from PIL import Image
+from transformers import CLIPProcessor, CLIPModel
 from tqdm import tqdm
 
 sys.path.append(".")
@@ -20,6 +20,7 @@ from metrics.imagenet_utils import get_embedding_for_prompt, imagenet_templates
 class EvalConfig:
     output_path: Path = Path("./outputs/")
     metrics_save_path: Path = Path("./metrics/")
+    clip_model_path: str = "G:/code/model/clip-vit-base-patch16"
 
     def __post_init__(self):
         self.metrics_save_path.mkdir(parents=True, exist_ok=True)
@@ -29,7 +30,8 @@ class EvalConfig:
 def run(config: EvalConfig):
     print("Loading CLIP model...")
     device = torch.device("cuda" if (torch.cuda.is_available() and torch.cuda.device_count() > 0) else "cpu")
-    model, preprocess = clip.load("ViT-B/16", device)
+    model = CLIPModel.from_pretrained(config.clip_model_path).to(device)
+    processor = CLIPProcessor.from_pretrained(config.clip_model_path)
     model.eval()
     print("Done.")
 
@@ -38,17 +40,17 @@ def run(config: EvalConfig):
 
     results_per_prompt = {}
     for prompt in tqdm(prompts):
-
         print(f'Running on: "{prompt}"')
 
         # get all images for the given prompt
         image_paths = [p for p in (config.output_path / prompt).rglob('*') if p.suffix in ['.png', '.jpg']]
         images = [Image.open(p) for p in image_paths]
         image_names = [p.name for p in image_paths]
-        queries = [preprocess(image).unsqueeze(0).to(device) for image in images]
+        
+        # 使用CLIP processor处理图像
+        image_inputs = processor(images=images, return_tensors="pt", padding=True).to(device)
 
         with torch.no_grad():
-
             # split prompt into first and second halves
             if ' and ' in prompt:
                 prompt_parts = prompt.split(' and ')
@@ -60,13 +62,13 @@ def run(config: EvalConfig):
                 continue
 
             # extract texture features
-            full_text_features = get_embedding_for_prompt(model, prompt, templates=imagenet_templates)
-            first_half_features = get_embedding_for_prompt(model, prompt_parts[0], templates=imagenet_templates)
-            second_half_features = get_embedding_for_prompt(model, prompt_parts[1], templates=imagenet_templates)
+            full_text_features = get_embedding_for_prompt(model, processor, prompt, templates=imagenet_templates)
+            first_half_features = get_embedding_for_prompt(model, processor, prompt_parts[0], templates=imagenet_templates)
+            second_half_features = get_embedding_for_prompt(model, processor, prompt_parts[1], templates=imagenet_templates)
 
             # extract image features
-            images_features = [model.encode_image(image) for image in queries]
-            images_features = [feats / feats.norm(dim=-1, keepdim=True) for feats in images_features]
+            images_features = model.get_image_features(**image_inputs)
+            images_features = images_features / images_features.norm(dim=-1, keepdim=True)
 
             # compute similarities
             full_text_similarities = [(feat.float() @ full_text_features.T).item() for feat in images_features]

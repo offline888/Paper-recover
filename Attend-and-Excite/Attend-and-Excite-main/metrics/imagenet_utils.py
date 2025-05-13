@@ -1,4 +1,4 @@
-import clip
+import torch
 
 imagenet_templates = [
     'a bad photo of a {}.',
@@ -84,12 +84,14 @@ imagenet_templates = [
 ]
 
 
-def get_embedding_for_prompt(model, prompt, templates):
+def get_embedding_for_prompt(model, processor, prompt, templates):
     texts = [template.format(prompt) for template in templates]  # format with class
     texts = [t.replace('a a', 'a') for t in texts]  # remove double a's
     texts = [t.replace('the a', 'a') for t in texts]  # remove double a's
-    texts = clip.tokenize(texts).cuda()  # tokenize
-    class_embeddings = model.encode_text(texts)  # embed with text encoder
+    
+    # 使用CLIP processor处理文本
+    text_inputs = processor(text=texts, return_tensors="pt", padding=True).to(model.device)
+    class_embeddings = model.get_text_features(**text_inputs)
     class_embeddings /= class_embeddings.norm(dim=-1, keepdim=True)
     class_embedding = class_embeddings.mean(dim=0)
     class_embedding /= class_embedding.norm()

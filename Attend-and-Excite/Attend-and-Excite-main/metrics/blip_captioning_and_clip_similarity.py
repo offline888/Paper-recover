@@ -3,11 +3,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-import clip
+import torch
 import numpy as np
 import pyrallis
-import torch
 from PIL import Image
+from transformers import CLIPProcessor, CLIPModel
 from lavis.models import load_model_and_preprocess
 from tqdm import tqdm
 
@@ -21,6 +21,7 @@ from metrics.imagenet_utils import get_embedding_for_prompt, imagenet_templates
 class EvalConfig:
     output_path: Path = Path("./outputs/")
     metrics_save_path: Path = Path("./metrics/")
+    clip_model_path: str = "G:/code/model/clip-vit-base-patch16"
 
     def __post_init__(self):
         self.metrics_save_path.mkdir(parents=True, exist_ok=True)
@@ -30,7 +31,8 @@ class EvalConfig:
 def run(config: EvalConfig):
     print("Loading CLIP model...")
     device = torch.device("cuda" if (torch.cuda.is_available() and torch.cuda.device_count() > 0) else "cpu")
-    model, preprocess = clip.load("ViT-B/16", device)
+    model = CLIPModel.from_pretrained(config.clip_model_path).to(device)
+    processor = CLIPProcessor.from_pretrained(config.clip_model_path)
     model.eval()
     print("Done.")
 
@@ -53,14 +55,16 @@ def run(config: EvalConfig):
 
         with torch.no_grad():
             # extract prompt embeddings
-            prompt_features = get_embedding_for_prompt(model, prompt, templates=imagenet_templates)
+            prompt_features = get_embedding_for_prompt(model, processor, prompt, templates=imagenet_templates)
 
             # extract blip captions and embeddings
             blip_input_images = [vis_processors["eval"](image).unsqueeze(0).to(device) for image in images]
             blip_captions = [blip_model.generate({"image": image})[0] for image in blip_input_images]
-            texts = [clip.tokenize([text]).cuda() for text in blip_captions]
-            caption_embeddings = [model.encode_text(t) for t in texts]
-            caption_embeddings = [embedding / embedding.norm(dim=-1, keepdim=True) for embedding in caption_embeddings]
+            
+            # 使用CLIP processor处理文本
+            text_inputs = processor(text=blip_captions, return_tensors="pt", padding=True).to(device)
+            caption_embeddings = model.get_text_features(**text_inputs)
+            caption_embeddings = caption_embeddings / caption_embeddings.norm(dim=-1, keepdim=True)
 
             text_similarities = [(caption_embedding.float() @ prompt_features.T).item()
                                  for caption_embedding in caption_embeddings]

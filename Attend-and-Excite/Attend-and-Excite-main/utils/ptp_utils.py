@@ -7,7 +7,7 @@ from IPython.display import display
 from PIL import Image
 from typing import Union, Tuple, List
 
-from diffusers.models.cross_attention import CrossAttention
+from diffusers.models.attention_processor import Attention as CrossAttention
 
 def text_under_image(image: np.ndarray, text: str, text_color: Tuple[int, int, int] = (0, 0, 0)) -> np.ndarray:
     h, w, c = image.shape
@@ -63,7 +63,7 @@ class AttendExciteCrossAttnProcessor:
 
     def __call__(self, attn: CrossAttention, hidden_states, encoder_hidden_states=None, attention_mask=None):
         batch_size, sequence_length, _ = hidden_states.shape
-        attention_mask = attn.prepare_attention_mask(attention_mask, sequence_length)
+        attention_mask = attn.prepare_attention_mask(attention_mask, sequence_length, batch_size)
 
         query = attn.to_q(hidden_states)
 
@@ -207,7 +207,7 @@ class AttentionStore(AttentionControl):
         Initialize an empty AttentionStore
         :param step_index: used to visualize only a specific step in the diffusion process
         '''
-        super(AttentionStore, self).__init__()
+        super().__init__()
         self.save_global_store = save_global_store
         self.step_store = self.get_empty_store()
         self.attention_store = {}
