@@ -11,8 +11,8 @@ __all__ = ["ImageNetDataProviderConfig", "ImageNetDataProvider"]
 
 @dataclass
 class ImageNetDataProviderConfig(BaseDataProviderConfig):
-    name: str = "imagenet"
-    data_dir: str = "~/dataset/imagenet"
+    name: str = "celeba"
+    data_dir: str = r"G:\code\datasets\self_made\DDIM_Inversion"
 
 
 class ImageNetDataProvider(BaseDataProvider):
@@ -22,7 +22,7 @@ class ImageNetDataProvider(BaseDataProvider):
 
     def build_datasets(self) -> tuple[Dataset, Dataset, Dataset]:
         transform = self.build_transform()
-        train_dataset = ImageFolder(os.path.join(self.cfg.data_dir, "train"), transform)
-        test_dataset = ImageFolder(os.path.join(self.cfg.data_dir, "val"), transform)
+        train_dataset = ImageFolder(os.path.join(self.cfg.data_dir), transform)
+        test_dataset = None
         val_dataset = None
         return train_dataset, val_dataset, test_dataset
