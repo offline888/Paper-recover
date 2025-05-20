@@ -5,16 +5,20 @@
 ## 📚 论文复现列表
 
 ### 已完成 (Completed)
- -  Attend and Excite
- -  Deepcache
+    -  Attend and Excite
+    -  Deepcache
 
 ### 进行中 (In Progress)
--  DCAE/SANA
+    -  DCAE/SANA
+    -  SiT
 
 ### 待完成 (Todo)
-- [ ] Forgedit
-- [ ] Freeu
-- [ ] DiT/SiT/UViT
+    - [ ] Forgedit
+    - [ ] Freeu
+    - [ ] UViT/Udiffuser
+    - [ ] REPA
+    - [ ] Consitency Model
+    - [ ] DDAE
 
 
 ## 🤝 贡献
